@@ -11,8 +11,35 @@ process_raw_data <- function(raw_data_zip_filename) {
   if(res == FALSE) stop('Failure extracting data. Exiting.')
   
   # TODO: Tidy up the data
-  testData <- read.table('data/test/X_test.txt')
-  trainData <- read.table('data/train/X_train.txt')
+#  testData <- read.table('data/test/X_test.txt')
+#  trainData <- read.table('data/train/X_train.txt')
+  
+  require(data.table)
+  testData <- data.table(testData)
+  
+  # Get all the feature names for the 561 columns
+  featureNames <- read.table('data/features.txt')
+  # Convert to a vector of strings
+  featuresVec <- c(as.character(featureNames[,2]))
+  # Set the names using make.names so they're R-compliant headers
+  setnames(testData, old=c(names(testData)), new=c(make.names(featuresVec)))
+  
+  # Create data table with the subjects
+  testSubjects <- read.table('data/test/subject_test.txt')
+  testSubjects <- data.table(testSubjects)
+  
+  # Create data table with the activities
+  testActivities <- read.table('data/test/y_test.txt')
+  testActivities <- data.table(testActivities)
+  
+  # TODO: Add a column to testActivities giving a text explanation of 
+  # the activity corresponding to the numbered activity which
+  # is in data/activity_labels.txt
+  
+  # TODO: column-bind the test subjects into the testData
+  # TODO: column-bind the activity labels into the test Data
+  
+  # TODO: Repeat for the train data, then merge them
   
 } # End of process_raw_data function
 
