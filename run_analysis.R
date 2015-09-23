@@ -2,6 +2,8 @@
 # from the fitness trackers, extract the zip file, merge
 # the test and train data sets, create a tidy data set,
 # and then output the tidy data set
+# If a zip filename is not provided, the function assumes
+# the default UCI HAR Dataset zip filename
 process_raw_data <- function(raw_data_zip_filename) {
   
   # Check for empty string being passed, and try
@@ -37,11 +39,16 @@ process_raw_data <- function(raw_data_zip_filename) {
   print('Labeling the data set with descriptive variable names...')
   labeledData <- label_variables(labeledData)
   if(is.null(labeledData)) stop('Failure labeling variable names. Exiting.')
+  print('Variable labeling complete.')
   
-  # TODO: Create a second, tidy data set with the average of each
-  # variable for each activity and each subject
-  # Maybe do an inner and outer loop, where the outer is the SubjectID
-  # and the inner is the ActivityID, and summarise_each() then rbind?
+  print('Summarizing the data set...')
+  tidyData <- summarize_data(labeledData)
+  if(is.null(tidyData)) stop('Failure summarizing the data. Exiting.')
+  print('Summarization complete.')
+
+  print('Writing out the tidy data set...')
+  write.table(tidyData, file = 'tidyData.txt', row.names = FALSE)
+  print('All operations completed succesfully. Exiting.')
   
 } # End of process_raw_data function
 
@@ -205,4 +212,53 @@ label_variables <- function(data) {
   # TODO: Consider using gsub() to clean up the variable names
   
   labeledData
+}
+
+# Create a second, tidy data set with the average of each
+# variable for each activity and each subject
+summarize_data <- function(data) {
+
+  require(sqldf)
+
+  tidyData <- NULL
+  
+  # There are 30 subjects and 6 activities, so using an outer loop
+  # for the subject IDs and inner loop for the activity IDs, summarize
+  # each of them in turn
+  for(i in 1:30) {
+    
+    # Construct the query using the subject ID index
+    query <- paste('select * from data where SubjectID=', 
+                   as.character(i))
+    currentSubject <- sqldf(query)
+    
+    for(j in 1:6) {
+      
+      query <- paste('select * from currentSubject where ActivityID=',
+                     as.character(j))
+      currentActivity <- sqldf(query)
+      
+      # Now currentActivity is a table with all the columns needed,
+      # but filtered to just the subject and activity ID so we can
+      # perform a summarise_each on it using a mean
+      # Note that this throws all sorts of warnings due to the mean
+      # function attempting to compute a mean for the characters in
+      # the activity name, and these are safe to ignore because we'll
+      # handle the activity name right after this
+      suppressWarnings(
+        singleRow <- summarise_each(currentActivity, funs(mean))
+      )
+      
+      # The problem now is that the singleRow has summarized away
+      # the ActivityName, so we need to replace that value
+      singleRow$ActivityName <- currentActivity$ActivityName[1]
+      
+      # And now that row is finalized, add it into the tidy
+      # data set to be returned once the inner and outer loop complete
+      tidyData <- rbind(tidyData, singleRow)
+      
+    } # end for j (activity ID) loop
+  } # end for i (subject ID) loop
+  
+  tidyData
 }
