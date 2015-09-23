@@ -4,15 +4,20 @@
 # and then output the tidy data set
 process_raw_data <- function(raw_data_zip_filename) {
   
-  # TODO: Check for empty string being passed, and try
+  # Check for empty string being passed, and try
   # to use the default zip file name for the dataset 
   # checking the working directory to see if it's there
+  if(missing(raw_data_zip_filename)) {
+    raw_data_zip_filename <- 'getdata-projectfiles-UCI HAR Dataset.zip'
+  }
   
   # Validate, extract, validate again, and rename
   # If this is successful, we have a data folder
   # containing all the data we expect to use
-  res <- validate_and_extract(raw_data_zip_filename)
-  if(res == FALSE) stop('Failure extracting data. Exiting.')
+  print('Unzipping and validating data...')
+  res <- validate_and_unzip(raw_data_zip_filename)
+  if(res == FALSE) stop('Failure unzipping data. Check to be sure the zip file exists in the working directory.')
+  print('Validation complete.')
   
   print('Merging data...')
   mergedData <- merge_data()
@@ -24,15 +29,14 @@ process_raw_data <- function(raw_data_zip_filename) {
   if(is.null(extractedData)) stop('Failure extracting data. Exiting.')
   print('Extraction complete.')
   
-  # TODO: Add a column to testActivities giving a text explanation of 
-  # the activity corresponding to the numbered activity which
-  # is in data/activity_labels.txt
+  print('Adding activity labels...')
+  labeledData <- label_activites(extractedData)
+  if(is.null(labeledData)) stop('Failure labeling activities. Exiting')
+  print('Activity labeling complete.')
   
-  # Get all the activity names for the various activities
-  activityNames <- read.table('data/activity_labels.txt')
-  # This will be used as a lookup table for the activity numbers
-  
-  # TODO: Label the data set with descriptive variable names
+  print('Labeling the data set with descriptive variable names...')
+  labeledData <- label_variables(labeledData)
+  if(is.null(labeledData)) stop('Failure labeling variable names. Exiting.')
   
   # TODO: Create a second, tidy data set with the average of each
   # variable for each activity and each subject
@@ -42,8 +46,8 @@ process_raw_data <- function(raw_data_zip_filename) {
 } # End of process_raw_data function
 
 # Validate that we have a zip file, it exists, can be
-# extracted, and contains the data we expect
-validate_and_extract <- function(filename) {
+# unzipped, and contains the data we expect
+validate_and_unzip <- function(filename) {
   
   # Make sure it's a zip file
   if(substr(filename,
@@ -81,7 +85,7 @@ validate_and_extract <- function(filename) {
   
   return(TRUE)
   
-} # End of validate_and_extract function
+} # End of validate_and_unzip function
 
 # Take the test data from the corresponding folder (assumes this is
 # already extracted) and train data, and merge them
@@ -152,4 +156,53 @@ extract_data <- function(data) {
 
   return(extracted_data)
   
+}
+
+# Given a data set with Activity ID's, use the activity_labels.txt
+# to add a column to the data set with the activity names
+label_activites <- function(data) {
+
+  # Get all the activity names for the various activities
+  # This will be used as a lookup table for the activity numbers
+  activityNames <- read.table('data/activity_labels.txt')
+  
+  # We only need to know the vector of names, because they are in 
+  # numerical order in the lookup table
+  activityVec <- activityNames[,2]
+  
+  # Get a vector of activity IDs
+  activityIDs <- data$ActivityID
+  
+  # Cross-reference the activity vector with the ID to create a new
+  # vector of activity names
+  activityNames <- activityVec[activityIDs]
+  
+  # Store this new vector of activity names in the original data
+  data$ActivityName <- activityNames
+  
+  # And finally, return the modified data
+  data
+}
+
+# Given a data set with ActivityID's, SubjectID, Activity, and the assortment
+# of variables for the various measurements, label the variables and order
+# the columns for a tidier (and more readable/printable) view
+label_variables <- function(data) {
+
+  # Using the dplyr select function, select only the SubjectID, ActivityID,
+  # Activity, and any columns matching (case-insensitively) 'mean' or 'std'
+  labeledData <- select(data, matches('SubjectID'),
+                           matches('ActivityID'),
+                           matches('Activity'),
+                           contains('mean', ignore.case = TRUE), 
+                           contains('std', ignore.case = TRUE))
+  
+  # Order the data table by SubjectID, then ActivityID
+  labeledData <- labeledData[order(labeledData$SubjectID, labeledData$ActivityID)]
+  
+  # Note that these labels are already fairly well using the 'make.names'
+  # function previously, but gsub() might be useful here
+  # TODO: Consider using gsub() to clean up the variable names
+  
+  labeledData
 }
